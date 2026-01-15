@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/scheduler/backend/internal/cache"
 	"github.com/scheduler/backend/internal/db"
+	"github.com/scheduler/backend/internal/notifier"
 )
 
 const (
@@ -21,15 +22,17 @@ type Worker struct {
 	db       *db.DB
 	queue    *Queue
 	cache    *cache.Cache
+	notifier *notifier.Notifier
 	interval time.Duration
 }
 
 // NewWorker creates a new background worker
-func NewWorker(database *db.DB, queue *Queue, postCache *cache.Cache, interval time.Duration) *Worker {
+func NewWorker(database *db.DB, queue *Queue, postCache *cache.Cache, n *notifier.Notifier, interval time.Duration) *Worker {
 	return &Worker{
 		db:       database,
 		queue:    queue,
 		cache:    postCache,
+		notifier: n,
 		interval: interval,
 	}
 }
@@ -117,6 +120,11 @@ func (w *Worker) publishPost(ctx context.Context, postID uuid.UUID) error {
 	// Invalidate cache for this user
 	if w.cache != nil {
 		_ = w.cache.InvalidateUserPosts(ctx, post.UserID)
+	}
+
+	// Notify SSE clients via Redis pub/sub
+	if w.notifier != nil {
+		w.notifier.Notify(post.UserID, notifier.UpdateTypePublish)
 	}
 
 	log.Printf("📤 Published post %s to %s: %s", post.ID, post.Channel, truncate(post.Content, 50))

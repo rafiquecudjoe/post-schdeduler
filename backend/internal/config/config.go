@@ -28,7 +28,7 @@ func Load() *Config {
 		SecureCookies:   getEnv("SECURE_COOKIES", "false") == "true",
 		AccessTokenTTL:  15 * time.Minute,
 		RefreshTokenTTL: 7 * 24 * time.Hour,
-		WorkerInterval:  10 * time.Second,
+		WorkerInterval:  2 * time.Second, // Reduced to 2 seconds for faster publishing
 	}
 
 	// Validate JWT secret strength
