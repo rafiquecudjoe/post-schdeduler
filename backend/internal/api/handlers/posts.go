@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -10,22 +12,25 @@ import (
 	"github.com/scheduler/backend/internal/cache"
 	"github.com/scheduler/backend/internal/db"
 	"github.com/scheduler/backend/internal/models"
+	"github.com/scheduler/backend/internal/notifier"
 	"github.com/scheduler/backend/internal/scheduler"
 )
 
 // PostHandler handles post endpoints
 type PostHandler struct {
-	db    *db.DB
-	queue *scheduler.Queue
-	cache *cache.Cache
+	db       *db.DB
+	queue    *scheduler.Queue
+	cache    *cache.Cache
+	notifier *notifier.Notifier
 }
 
 // NewPostHandler creates a new post handler
-func NewPostHandler(database *db.DB, queue *scheduler.Queue, postCache *cache.Cache) *PostHandler {
+func NewPostHandler(database *db.DB, queue *scheduler.Queue, postCache *cache.Cache, n *notifier.Notifier) *PostHandler {
 	return &PostHandler{
-		db:    database,
-		queue: queue,
-		cache: postCache,
+		db:       database,
+		queue:    queue,
+		cache:    postCache,
+		notifier: n,
 	}
 }
 
@@ -104,15 +109,24 @@ func (h *PostHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add to scheduling queue
-	if err := h.queue.Enqueue(r.Context(), post.ID, scheduledAt); err != nil {
-		// Log error but don't fail - worker can pick up from DB
-	}
+	// Add to scheduling queue (async, don't block response)
+	go func() {
+		if err := h.queue.Enqueue(context.Background(), post.ID, scheduledAt); err != nil {
+			log.Printf("⚠️ Failed to enqueue post %s: %v", post.ID, err)
+		}
+	}()
 
-	// Invalidate cache
-	if h.cache != nil {
-		_ = h.cache.InvalidateUserPosts(r.Context(), user.ID)
-	}
+	// Invalidate cache (async)
+	go func() {
+		if h.cache != nil {
+			_ = h.cache.InvalidateUserPosts(context.Background(), user.ID)
+		}
+	}()
+
+	// Notify SSE clients of the new post (async for Redis pub, sync for local)
+	log.Printf("📢 [POST CREATE] Sending notification for user %s, post %s", user.ID, post.ID)
+	h.notifier.Notify(user.ID, notifier.UpdateTypeCreate)
+	log.Printf("✅ [POST CREATE] Notification sent for user %s", user.ID)
 
 	respondJSON(w, http.StatusCreated, post)
 }
@@ -296,17 +310,26 @@ func (h *PostHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update queue if scheduled_at changed
+	// Update queue if scheduled_at changed (async)
 	if scheduledAt != nil {
-		if err := h.queue.Update(r.Context(), post.ID, *scheduledAt); err != nil {
-			// Log error but don't fail
-		}
+		go func() {
+			if err := h.queue.Update(context.Background(), post.ID, *scheduledAt); err != nil {
+				log.Printf("⚠️ Failed to update queue for post %s: %v", post.ID, err)
+			}
+		}()
 	}
 
-	// Invalidate cache
-	if h.cache != nil {
-		_ = h.cache.InvalidateUserPosts(r.Context(), user.ID)
-	}
+	// Invalidate cache (async)
+	go func() {
+		if h.cache != nil {
+			_ = h.cache.InvalidateUserPosts(context.Background(), user.ID)
+		}
+	}()
+
+	// Notify SSE clients of the update
+	log.Printf("📢 [POST UPDATE] Sending notification for user %s, post %s", user.ID, post.ID)
+	h.notifier.Notify(user.ID, notifier.UpdateTypeUpdate)
+	log.Printf("✅ [POST UPDATE] Notification sent for user %s", user.ID)
 
 	respondJSON(w, http.StatusOK, post)
 }
@@ -356,13 +379,22 @@ func (h *PostHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Remove from queue
-	_ = h.queue.Remove(r.Context(), postID)
+	// Remove from queue (async)
+	go func() {
+		_ = h.queue.Remove(context.Background(), postID)
+	}()
 
-	// Invalidate cache
-	if h.cache != nil {
-		_ = h.cache.InvalidateUserPosts(r.Context(), user.ID)
-	}
+	// Invalidate cache (async)
+	go func() {
+		if h.cache != nil {
+			_ = h.cache.InvalidateUserPosts(context.Background(), user.ID)
+		}
+	}()
+
+	// Notify SSE clients of the deletion
+	log.Printf("📢 [POST DELETE] Sending notification for user %s, post %s", user.ID, postID)
+	h.notifier.Notify(user.ID, notifier.UpdateTypeDelete)
+	log.Printf("✅ [POST DELETE] Notification sent for user %s", user.ID)
 
 	w.WriteHeader(http.StatusNoContent)
 }
