@@ -310,7 +310,18 @@ cd backend && go run ./cmd/server --worker
 
 ## 📹 Demo Video
 
-[Link to demo video will be added here]
+**🎬 [Watch the Full Demo Video](YOUR_VIDEO_LINK_HERE)**
+
+*10-minute walkthrough covering:*
+- Local setup with Docker Compose
+- User registration and authentication
+- Creating and scheduling posts
+- Background worker publishing posts in real-time
+- Real-time SSE updates without page refresh
+- Code architecture highlights
+- Security features and rate limiting
+
+*Video will demonstrate the complete scheduling → publishing flow with a post scheduled 1 minute in the future, showing live worker logs as it processes and publishes the post.*
 
 ## 📄 License
 
