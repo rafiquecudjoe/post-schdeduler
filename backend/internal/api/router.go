@@ -11,6 +11,7 @@ import (
 	"github.com/scheduler/backend/internal/auth"
 	"github.com/scheduler/backend/internal/cache"
 	"github.com/scheduler/backend/internal/db"
+	"github.com/scheduler/backend/internal/notifier"
 	"github.com/scheduler/backend/internal/scheduler"
 )
 
@@ -29,6 +30,9 @@ func NewRouter(
 	// Initialize cache
 	postCache := cache.NewCache(redisClient)
 
+	// Initialize notifier for real-time updates (with Redis pub/sub)
+	postNotifier := notifier.NewNotifier(redisClient)
+
 	// Global middleware
 	r.Use(middleware.Logger)
 	r.Use(cors.Handler(cors.Options{
@@ -41,8 +45,8 @@ func NewRouter(
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(database, jwtService, blacklist, secureCookies)
-	postHandler := handlers.NewPostHandler(database, queue, postCache)
-	sseHandler := handlers.NewSSEHandler(database)
+	postHandler := handlers.NewPostHandler(database, queue, postCache, postNotifier)
+	sseHandler := handlers.NewSSEHandler(database, postNotifier)
 
 	// Auth middleware
 	authMiddleware := middleware.Auth(jwtService, database)

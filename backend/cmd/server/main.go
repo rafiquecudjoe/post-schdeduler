@@ -17,6 +17,7 @@ import (
 	"github.com/scheduler/backend/internal/cache"
 	"github.com/scheduler/backend/internal/config"
 	"github.com/scheduler/backend/internal/db"
+	"github.com/scheduler/backend/internal/notifier"
 	"github.com/scheduler/backend/internal/scheduler"
 )
 
@@ -76,7 +77,8 @@ func main() {
 		// Run as worker
 		log.Println("🔧 Starting in WORKER mode")
 		postCache := cache.NewCache(redisClient)
-		worker := scheduler.NewWorker(database, queue, postCache, cfg.WorkerInterval)
+		postNotifier := notifier.NewNotifier(redisClient)
+		worker := scheduler.NewWorker(database, queue, postCache, postNotifier, cfg.WorkerInterval)
 		worker.Run(ctx)
 	} else {
 		// Run as API server
