@@ -9,17 +9,20 @@ import (
 
 	"github.com/scheduler/backend/internal/db"
 	"github.com/scheduler/backend/internal/models"
+	"github.com/scheduler/backend/internal/notifier"
 )
 
 // SSEHandler handles Server-Sent Events for real-time updates
 type SSEHandler struct {
-	db *db.DB
+	db       *db.DB
+	notifier *notifier.Notifier
 }
 
 // NewSSEHandler creates a new SSE handler
-func NewSSEHandler(database *db.DB) *SSEHandler {
+func NewSSEHandler(database *db.DB, n *notifier.Notifier) *SSEHandler {
 	return &SSEHandler{
-		db: database,
+		db:       database,
+		notifier: n,
 	}
 }
 
@@ -68,12 +71,20 @@ func (h *SSEHandler) StreamPosts(w http.ResponseWriter, r *http.Request) {
 	}
 	flusher.Flush()
 
-	// Create ticker for periodic updates (every 5 seconds for faster updates)
-	ticker := time.NewTicker(5 * time.Second)
+	// Subscribe to notifications for this user
+	log.Printf("🔔 [SSE] User %s subscribed to real-time updates", user.ID)
+	updateChan := h.notifier.Subscribe(user.ID)
+	defer func() {
+		log.Printf("🔕 [SSE] User %s unsubscribed from real-time updates", user.ID)
+		h.notifier.Unsubscribe(user.ID, updateChan)
+	}()
+
+	// Create ticker for periodic updates (every 30 seconds as backup)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	// Create keepalive ticker to prevent timeout (every 10 seconds, more frequent)
-	keepaliveTicker := time.NewTicker(10 * time.Second)
+	// Create keepalive ticker to prevent timeout (every 15 seconds)
+	keepaliveTicker := time.NewTicker(15 * time.Second)
 	defer keepaliveTicker.Stop()
 
 	// Keep track of last sent data to avoid duplicate updates
@@ -101,6 +112,62 @@ func (h *SSEHandler) StreamPosts(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "event: update\ndata: %s\n\n", jsonData)
 	flusher.Flush()
 
+	// Helper function to send update
+	sendUpdate := func() bool {
+		start := time.Now()
+		
+		// Fetch upcoming posts
+		upcoming, err := h.db.GetUpcomingPosts(r.Context(), user.ID)
+		if err != nil {
+			log.Printf("SSE: ERROR - Failed to fetch upcoming: %v", err)
+			return true // Continue on error
+		}
+		if upcoming == nil {
+			upcoming = []*models.Post{}
+		}
+
+		// Fetch history posts
+		history, err := h.db.GetPublishedPosts(r.Context(), user.ID)
+		if err != nil {
+			log.Printf("SSE: ERROR - Failed to fetch history: %v", err)
+			return true // Continue on error
+		}
+		if history == nil {
+			history = []*models.Post{}
+		}
+
+		// Create hashes to detect changes
+		upcomingHash := hashPosts(upcoming)
+		historyHash := hashPosts(history)
+
+		// Send update if data changed
+		if upcomingHash != lastUpcomingHash || historyHash != lastHistoryHash {
+			lastUpcomingHash = upcomingHash
+			lastHistoryHash = historyHash
+
+			data := map[string]interface{}{
+				"upcoming": upcoming,
+				"history":  history,
+			}
+
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				log.Printf("SSE: ERROR - Failed to marshal data: %v", err)
+				return true // Continue on error
+			}
+
+			if _, err := fmt.Fprintf(w, "event: update\ndata: %s\n\n", jsonData); err != nil {
+				log.Printf("SSE: ERROR - Failed to write update, client disconnected: %v", err)
+				return false // Stop on write error
+			}
+			flusher.Flush()
+			
+			elapsed := time.Since(start)
+			log.Printf("✅ [SSE] Data fetched and sent in %v", elapsed)
+		}
+		return true // Continue
+	}
+
 	// Send updates until client disconnects
 	for {
 		select {
@@ -113,49 +180,18 @@ func (h *SSEHandler) StreamPosts(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			flusher.Flush()
+		case <-updateChan:
+			// Real-time notification received - send update immediately
+			log.Printf("⚡ [SSE] Real-time notification received for user %s, sending update...", user.ID)
+			start := time.Now()
+			if !sendUpdate() {
+				return
+			}
+			log.Printf("✅ [SSE] Update sent to user %s in %v", user.ID, time.Since(start))
 		case <-ticker.C:
-			// Fetch current data
-			upcoming, err := h.db.GetUpcomingPosts(r.Context(), user.ID)
-			if err != nil {
-				continue
-			}
-			if upcoming == nil {
-				upcoming = []*models.Post{}
-			}
-
-			history, err := h.db.GetPublishedPosts(r.Context(), user.ID)
-			if err != nil {
-				continue
-			}
-			if history == nil {
-				history = []*models.Post{}
-			}
-
-			// Create hashes to detect changes
-			upcomingHash := hashPosts(upcoming)
-			historyHash := hashPosts(history)
-
-			// Send update if data changed
-			if upcomingHash != lastUpcomingHash || historyHash != lastHistoryHash {
-				lastUpcomingHash = upcomingHash
-				lastHistoryHash = historyHash
-
-				data := map[string]interface{}{
-					"upcoming": upcoming,
-					"history":  history,
-				}
-
-				jsonData, err := json.Marshal(data)
-				if err != nil {
-					log.Printf("SSE: ERROR - Failed to marshal data: %v", err)
-					continue
-				}
-
-				if _, err := fmt.Fprintf(w, "event: update\ndata: %s\n\n", jsonData); err != nil {
-					log.Printf("SSE: ERROR - Failed to write update, client disconnected: %v", err)
-					return
-				}
-				flusher.Flush()
+			// Periodic backup check
+			if !sendUpdate() {
+				return
 			}
 		}
 	}
