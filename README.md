@@ -290,27 +290,10 @@ cd backend && go run ./cmd/server --worker
 - Worker handles errors gracefully without crashing
 - Retry tracking: `retry_count`, `last_error`, `next_retry_at` fields
 
-## ⚠️ Known Limitations
-
-1. **No real social media integration** - Publishing is mocked
-2. **No media uploads** - Text content only
-3. **Single timezone** - All times stored in UTC, displayed in browser's local time
-
-## 🔮 Future Improvements
-
-- [ ] Media upload support (images, videos)
-- [ ] User timezone preferences
-- [ ] Team/organization features
-- [ ] Analytics dashboard
-- [x] ~~Rate limiting~~ ✅
-- [x] ~~Redis caching~~ ✅
-- [x] ~~Retry mechanism with exponential backoff~~ ✅
-- [x] ~~Cypress E2E tests~~ ✅
-- [x] ~~Real-time updates via SSE~~ ✅
 
 ## 📹 Demo Video
 
-**🎬 [Watch the Full Demo Video](YOUR_VIDEO_LINK_HERE)**
+**🎬 [Watch the Full Demo Video](https://www.loom.com/share/ec040fceb30941b9b7c6f783c9dd46f5)**
 
 *10-minute walkthrough covering:*
 - Local setup with Docker Compose
@@ -323,6 +306,4 @@ cd backend && go run ./cmd/server --worker
 
 *Video will demonstrate the complete scheduling → publishing flow with a post scheduled 1 minute in the future, showing live worker logs as it processes and publishes the post.*
 
-## 📄 License
 
-MIT
