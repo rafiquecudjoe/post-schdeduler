@@ -122,14 +122,44 @@ openssl rand -base64 48
 
 3. **Start all services with Docker Compose**
    ```bash
-   docker-compose up --build
+   # Build and start all services (first time or after code changes)
+   docker-compose up --build -d
+   
+   # Or just start services (if already built)
+   docker-compose up -d
+   
+   # View logs
+   docker-compose logs -f
+   
+   # View specific service logs
+   docker-compose logs -f backend
+   docker-compose logs -f worker
+   docker-compose logs -f frontend
+   
+   # Stop all services
+   docker-compose down
+   
+   # Stop and remove volumes (clean slate)
+   docker-compose down -v
    ```
 
-3. **Access the application**
+4. **Access the application**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8080
+   - Health Check: http://localhost:8080/health
 
-4. **Create a test user**
+5. **Verify all services are running**
+   ```bash
+   docker-compose ps
+   ```
+   You should see 5 services running:
+   - `postgres` (port 5432)
+   - `redis` (port 6379)
+   - `backend` (port 8080)
+   - `worker` (background scheduler)
+   - `frontend` (port 3000)
+
+6. **Create a test user**
    ```bash
    curl -X POST http://localhost:8080/api/auth/register \
      -H "Content-Type: application/json" \
@@ -305,5 +335,61 @@ cd backend && go run ./cmd/server --worker
 - Security features and rate limiting
 
 *Video will demonstrate the complete scheduling → publishing flow with a post scheduled 1 minute in the future, showing live worker logs as it processes and publishes the post.*
+
+## 🔧 Troubleshooting
+
+### Docker Permission Issues
+
+If you get "permission denied" errors when running `docker-compose`:
+
+```bash
+# Option 1: Add your user to docker group (requires logout/login)
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Option 2: Use sg docker -c for one-time commands
+sg docker -c "docker-compose up -d"
+sg docker -c "docker-compose ps"
+sg docker -c "docker-compose logs -f backend"
+```
+
+### Port Already in Use
+
+If ports 3000, 5432, 6379, or 8080 are already in use:
+
+```bash
+# Find and kill processes on specific port
+lsof -ti:8080 | xargs kill -9
+
+# Or change ports in docker-compose.yml
+# Example: Change "3000:3000" to "3001:3000" for frontend
+```
+
+### Services Won't Start
+
+```bash
+# Check logs for specific service
+docker-compose logs backend
+docker-compose logs worker
+
+# Restart all services
+docker-compose restart
+
+# Clean restart (removes volumes - will delete data)
+docker-compose down -v
+docker-compose up --build -d
+```
+
+### Frontend Can't Connect to Backend
+
+Ensure environment variables are set correctly in `.env`:
+```bash
+CORS_ORIGIN=http://localhost:3000
+```
+
+And that all services are healthy:
+```bash
+docker-compose ps  # Should show all services as "healthy" or "running"
+```
 
 
