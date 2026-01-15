@@ -28,7 +28,20 @@ type PostWithRetry = models.Post
 
 // New creates a new database connection
 func New(ctx context.Context, databaseURL string) (*DB, error) {
-	pool, err := pgxpool.New(ctx, databaseURL)
+	// Parse config to set optimal pool settings
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse database URL: %w", err)
+	}
+	
+	// Optimize connection pool for low latency
+	config.MaxConns = 25                          // Increase max connections
+	config.MinConns = 5                           // Keep minimum connections ready
+	config.MaxConnLifetime = 30 * time.Minute     // Connection lifetime
+	config.MaxConnIdleTime = 5 * time.Minute      // Idle connection timeout
+	config.HealthCheckPeriod = 30 * time.Second   // Health check interval
+	
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create connection pool: %w", err)
 	}
