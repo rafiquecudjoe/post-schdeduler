@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS posts;
+DROP TYPE IF EXISTS post_status;
+DROP TYPE IF EXISTS channel_type;
