@@ -4,7 +4,7 @@ A minimal Buffer-like social media post scheduler built with Go, Next.js, Postgr
 
 ## 🎥 Demo Video
 
-**[Watch the Full Demo on Loom](https://www.loom.com/share/25396c8eaddc45ffa8d84d684033ad8b)** _(Unlisted Video)_
+**[Watch the Full Demo on Loom](https://www.loom.com/share/9ac92c36041b4fabb54505c407a6daf3)** _(Unlisted Video)_
 
 See real-time post scheduling, Server-Sent Events in action, and sub-millisecond updates!
 
