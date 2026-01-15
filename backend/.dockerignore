@@ -1,0 +1,20 @@
+# Ignore build artifacts
+server
+*.exe
+*.test
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore temporary files
+*.tmp
+*.log
+
+# Ignore test files (optional - remove if you want to run tests in container)
+*_test.go
+
+# Ignore documentation
+*.md

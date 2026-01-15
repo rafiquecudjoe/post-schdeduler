@@ -43,11 +43,10 @@ export function usePostStream(options: UsePostStreamOptions = {}) {
         const MAX_CONSECUTIVE_ERRORS = 5;
 
         const connect = () => {
-            // Connect directly to backend for SSE (bypass Next.js proxy which times out)
-            // For production, this should be changed to use the proxy or set via environment variable
-            const sseUrl = process.env.NODE_ENV === 'development' 
-                ? 'http://localhost:8080/api/posts/stream'
-                : '/api/posts/stream';
+            // Use NEXT_PUBLIC_API_URL for client-side connections (browser)
+            // Falls back to localhost:8080 for local development
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+            const sseUrl = `${apiUrl}/api/posts/stream`;
             
             eventSource = new EventSource(sseUrl, {
                 withCredentials: true,

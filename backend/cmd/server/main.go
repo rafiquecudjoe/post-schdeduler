@@ -49,11 +49,13 @@ func main() {
 	defer database.Close()
 	log.Println("✅ Connected to PostgreSQL")
 
-	// Run migrations
-	if err := database.RunMigrations(ctx); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+	// Run migrations only in API server mode (not in worker mode)
+	if !*workerMode {
+		if err := database.RunMigrations(ctx); err != nil {
+			log.Fatalf("Failed to run migrations: %v", err)
+		}
+		log.Println("✅ Database migrations complete")
 	}
-	log.Println("✅ Database migrations complete")
 
 	// Connect to Redis
 	redisClient := redis.NewClient(&redis.Options{

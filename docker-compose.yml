@@ -35,14 +35,14 @@ services:
     build: ./backend
     ports:
       - "8080:8080"
-    env_file:
-      - .env.development
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGIN: ${CORS_ORIGIN}
-      SECURE_COOKIES: ${SECURE_COOKIES}
+      DATABASE_URL: postgresql://scheduler:${POSTGRES_PASSWORD:-scheduler}@postgres:5432/scheduler?sslmode=disable
+      REDIS_URL: redis:6379
+      JWT_SECRET: ${JWT_SECRET:-UbZ+XfoXWqPhZhXxDbdHwyQKWhWF+W9j4hNmlBmY0bJkOFF4A98Wta2iK/uEHnF1}
+      CORS_ORIGIN: http://localhost:3000
+      SECURE_COOKIES: false
+      SERVER_PORT: 8080
+      ENVIRONMENT: development
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,12 +53,11 @@ services:
 
   worker:
     build: ./backend
-    env_file:
-      - .env.development
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgresql://scheduler:${POSTGRES_PASSWORD:-scheduler}@postgres:5432/scheduler?sslmode=disable
+      REDIS_URL: redis:6379
+      JWT_SECRET: ${JWT_SECRET:-UbZ+XfoXWqPhZhXxDbdHwyQKWhWF+W9j4hNmlBmY0bJkOFF4A98Wta2iK/uEHnF1}
+      ENVIRONMENT: development
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,7 +72,9 @@ services:
     ports:
       - "3000:3000"
     environment:
+      # Client-side API URL (browser requests)
       NEXT_PUBLIC_API_URL: http://localhost:8080
+      # Server-side API URL (SSR requests)
       API_URL: http://backend:8080
     depends_on:
       - backend

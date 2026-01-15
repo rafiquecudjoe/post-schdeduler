@@ -1,10 +1,10 @@
 import { AuthResponse, Post, CreatePostRequest, UpdatePostRequest, ErrorResponse } from './types';
 
-// Use relative URLs in browser (goes through Next.js proxy)
-// Only use absolute URL for SSR/server components
+// Use NEXT_PUBLIC_API_URL for browser (client-side) requests
+// Use API_URL for server-side (SSR) requests
 const API_URL = typeof window === 'undefined'
     ? (process.env.API_URL || 'http://localhost:8080')
-    : '';
+    : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080');
 
 class ApiError extends Error {
     status: number;
