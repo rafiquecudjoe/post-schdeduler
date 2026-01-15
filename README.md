@@ -108,19 +108,19 @@ openssl rand -base64 48
 
 2. **Configure environment variables**
    ```bash
-   # Copy the example environment file
+   # For Docker Compose deployment:
+   cp .env.example .env
+   
+   # Edit .env and set required variables:
+   # - POSTGRES_PASSWORD (choose a secure password)
+   # - JWT_SECRET (generate with: openssl rand -base64 32)
+   
+   # For local development (running services individually):
    cp .env.example .env.development
-   
-   # Generate a secure JWT secret (32+ characters required)
-   openssl rand -base64 48
-   
-   # Edit .env.development and:
-   # - Replace JWT_SECRET with generated value
-   # - Update DATABASE_URL if needed
-   # - Set other variables as needed
+   # Edit .env.development and set DATABASE_URL, REDIS_URL, JWT_SECRET
    ```
 
-3. **Start all services**
+3. **Start all services with Docker Compose**
    ```bash
    docker-compose up --build
    ```
